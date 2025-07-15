@@ -1,24 +1,27 @@
 # Bayesian Inference of Coral Bleaching Dynamics
 
-This project is available on GitHub at: [https://github.com/jodie-c/stan_tutorial/tree/main/coral-reef-example](https://github.com/jodie-c/stan_tutorial/tree/main/coral-reef-example)
+
 
 ![Code Folder Structure](diagram.png)
 
 ## What's in this repo?
-- **95 total files** 
 - **11 main folders** 
 - **14 R scripts** 
 - **16 Stan models** 
-- **27 RDS files** 
+- **8 RDS files**
+
+> **Note:** The following large RDS files were NOT uploaded due to GitHub's 100MB file size limit:
+> - stan_fit_no_pooling.rds
+> - stan_fit_partial_centered.rds
+> - stan_fit_partial_noncentered.rds
 
 ## Folder Structure
 
-The repository is organized into 11 main directories:
 
-**01. pooling_methods/**: This is where the main modeling happens!
+**01. pooling_methods/**: 
    - **r_file/**: 4 R scripts for 4 different pooling approaches
-   - **stan_file/**: The corresponding 6 Stan models I wrote
-   - **rds/**: Saved model fits
+   - **stan_file/**: The corresponding 6 Stan models
+   - **rds/**: Saved model fits (see note above for excluded files)
 
 **02. prior_check_r_stan_plot/**: Prior distribution analysis
    - **prior_check_r_file/**: R scripts for 4 different prior checks
@@ -52,22 +55,13 @@ The repository is organized into 11 main directories:
    - **05. coral_reef_dynamic/**: Coral reef dynamics visualizations
    - **06. funnel_reparameterization/**: Centered and non-centered reparameterization
 
-**09. master_thesis/**: My master thesis document
 
-**10. data/**: Raw and processed coral data
+**09. data/**: Raw and processed coral data
 
-**11. funnel_reparameterization/**: R scripts for analyzing centered and non-centered parameterizations
+**10. funnel_reparameterization/**: R scripts for analyzing centered and non-centered parameterizations
    - Launch scripts for ShinyStanR to visualize MCMC diagnostics
 
-## Models
 
-The project implements several Bayesian modeling approaches:
-- Complete pooling: Assumes all reefs share identical parameters
-- No pooling: Treats each reef as completely independent
-- Partial pooling: Hierarchical model that balances between complete and no pooling
-  - Centered parameterization
-  - Non-centered parameterization
-  - Sparse data handling
 
 ## Requirements
 
@@ -88,8 +82,5 @@ Each R script can be run on its own. My typical workflow was:
 5. Compare different models
 6. Make pretty plots of the results
 
-Feel free to reach out if you have questions!
 
-## Author
 
-Chen Gu
