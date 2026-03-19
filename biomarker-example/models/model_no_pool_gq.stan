@@ -1,0 +1,174 @@
+functions {
+  real lookup(array[] real ts, vector Tx_data, real t, int no_ts) {
+
+    if (t < ts[1]){
+        return Tx_data[1];
+      }
+
+    for (i in 1:(no_ts - 1)) {
+      if (t >= ts[i] && t < ts[i + 1]) {
+        return Tx_data[i+1];
+        }
+
+    }
+    return Tx_data[no_ts+1];  // If t is out of bounds, return last value
+  }
+
+  vector pca_model(real t,
+                   vector SDP,
+                   vector p,
+                   vector Tx_data,
+                   array[] real ts,
+                   int no_ts) {
+    vector[3] SDPdt;
+
+    real Tx = lookup(ts, Tx_data, t, no_ts);  // retrieve Tx at time t
+
+    SDPdt[1] = SDP[1] / (SDP[1] + SDP[2]) * p[1] * p[2] * SDP[1];
+
+    SDPdt[2] = (1 - (SDP[1] * p[1]) / (SDP[1] + SDP[2])) * p[2] * SDP[1] - p[3] * SDP[2] * Tx;
+
+    SDPdt[3] = p[4] * SDP[2] - p[5] * SDP[3];
+
+    return SDPdt;
+  }
+}
+
+data {
+  int<lower=1> no_reps;
+  int<lower=1> no_ts_max;
+  
+  vector<lower=0>[no_reps] t0_data;
+  int<lower=0> ts_lengths[no_reps]; 
+
+  array[no_reps] vector [no_ts_max] ts_data;
+  
+  vector<lower=0>[no_reps] y1_data_0; 
+  array[no_reps] vector[no_ts_max] y1_data;
+  array[no_reps] vector[no_ts_max +1] Tx_data; //Tx0 included
+  
+  int<lower=1> no_ts_max_all;
+  array[no_reps] vector [no_ts_max_all] ts_data_all;
+  array[no_reps] vector[no_ts_max_all +1] Tx_data_all;
+  
+  int<lower=1> no_t_gd; //generated data
+  array[no_t_gd] real t_gd;
+  
+  int patient_col;
+  int nr_plot_points;
+
+}
+
+parameters {
+  
+  
+  array[no_reps] real<lower=0, upper = 0.1*2> p1; //ps
+  array[no_reps] real<lower=0, upper = 1*2> p2; //lambda
+  array[no_reps] real<lower=0, upper = 0.1*2> p3; //alpha
+  array[no_reps] real<lower=0, upper = 0.001*3> p4; //rho
+  array[no_reps] real<lower=0, upper = 1*2> p5; //phi
+  
+  real<lower=0> sigma_1;
+  real<lower=0> sigma_2;
+
+}
+
+model {
+  
+  for (n in 1:no_reps)
+    {
+      p1[n] ~ normal(0.0278, 0.1); //Ps
+      p2[n] ~ normal(0.69, 1); //lambda
+      p3[n] ~ normal(0.036, 0.1); //alpha
+      p4[n] ~ normal(0.000187,0.001); //rho
+      p5[n] ~ normal(0.0856, 1); //phi
+    }
+  
+  sigma_1 ~normal(0, 1);
+  sigma_2 ~normal(0, 1);
+  
+  vector[3] SDP0;
+  vector[5] p;
+  
+  for(x in 1:no_reps)
+  {
+    p[1] = p1[x];
+    p[2] = p2[x];
+    p[3] = p3[x];
+    p[4] = p4[x];
+    p[5] = p5[x];
+    
+    SDP0[1] = 10;
+    SDP0[2] = 1000;
+    SDP0[3] = y1_data_0[x];
+    
+    int ts_slice;
+    ts_slice = ts_lengths[x];
+    
+    // Temporary array to store converted data
+    real ts_array[ts_slice];  
+    for (ts in 1:ts_slice) {
+      ts_array[ts] = ts_data[x, ts];
+    }
+    
+    array[ts_slice] vector[3] mu = ode_rk45(pca_model, SDP0, t0_data[x], ts_array, p, Tx_data[x], ts_array, ts_slice);
+
+    for (t in 1:ts_slice){
+      y1_data[x,t] ~normal(mu[t][3], sigma_1 + mu[t][3]*sigma_2);
+    }
+  }
+}
+
+generated quantities{
+  array[no_t_gd] vector[no_reps] y_fit_tot;
+  vector[sum(ts_lengths)] log_lik;
+  int n_offset = 0;
+  
+  for (patient in 1:no_reps){
+
+    vector[3] SDP0;
+    
+    SDP0[1] = 10;
+    SDP0[2] = 1000;
+    SDP0[3] = y1_data_0[patient];
+    
+    vector[5] p;
+    p[1] = p1[patient];
+    p[2] = p2[patient];
+    p[3] = p3[patient];
+    p[4] = p4[patient];
+    p[5] = p5[patient];
+  
+  
+    // Temporary array to store converted data
+    real ts_array[nr_plot_points];
+    for (ts in 1:nr_plot_points) {
+      ts_array[ts] = ts_data_all[patient, ts];
+    }
+    
+    array[no_t_gd] vector[3] y_fit = ode_rk45(pca_model, SDP0, t0_data[patient], t_gd, p, Tx_data_all[patient],ts_array, nr_plot_points);
+    
+    for(t in 1:no_t_gd){
+      y_fit_tot[t][patient] = y_fit[t][3] +  normal_rng(0, sigma_1 + y_fit[t][3]*sigma_2);
+    }
+    
+    // Compute log-likelihood for ELPD-loo calculation
+    int ts_slice;
+    ts_slice = ts_lengths[patient];
+
+    // Temporary array to store converted data
+    real ts_array_llh[ts_slice];
+    for (ts in 1:ts_slice) {
+      ts_array_llh[ts] = ts_data[patient, ts];
+    }
+
+    array[ts_slice] vector[3] mu = ode_rk45(pca_model, SDP0, t0_data[patient], ts_array_llh, p, Tx_data[patient], ts_array_llh, ts_slice);
+
+    for (n in 1:ts_slice){
+      log_lik[n+n_offset] = normal_lpdf(y1_data[patient,n]| mu[n][3], sigma_1 + mu[n][3]*sigma_2);
+    }
+    n_offset = n_offset + ts_slice;
+    
+  }
+}
+
