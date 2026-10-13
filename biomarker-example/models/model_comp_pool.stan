@@ -39,7 +39,7 @@ data {
   int<lower=1> no_ts_max;
   
   vector<lower=0>[no_reps] t0_data;
-  int<lower=0> ts_lengths[no_reps];  
+  array[no_reps] int<lower=0> ts_lengths;  
 
   array[no_reps] vector [no_ts_max] ts_data;
   
@@ -98,7 +98,7 @@ model {
     ts_slice = ts_lengths[x];
 
     // Temporary array to store converted data
-    real ts_array[ts_slice];
+    array[ts_slice] real ts_array;
     for (ts in 1:ts_slice) {
       ts_array[ts] = ts_data[x, ts];
     }
